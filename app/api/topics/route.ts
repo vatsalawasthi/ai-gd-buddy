@@ -1,42 +1,69 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import { safeConnectToDatabase } from "@/lib/mongodb";
 import GDTopic from "@/models/GDTopic";
 import { getCurrentUser } from "@/lib/auth";
+import { memoryStore, DEFAULT_TOPICS } from "@/lib/memoryStore";
 
 export async function GET(req: NextRequest) {
   try {
-    await connectToDatabase();
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search") || "";
     const category = searchParams.get("category") || "";
     const difficulty = searchParams.get("difficulty") || "";
 
-    const query: any = { isActive: true };
+    const db = await safeConnectToDatabase();
+
+    if (db) {
+      try {
+        const query: any = { isActive: true };
+
+        if (search.trim()) {
+          query.$or = [
+            { title: { $regex: search.trim(), $options: "i" } },
+            { description: { $regex: search.trim(), $options: "i" } },
+          ];
+        }
+
+        if (category && category !== "All") {
+          query.category = category;
+        }
+
+        if (difficulty && difficulty !== "All") {
+          query.difficulty = difficulty;
+        }
+
+        const topics = await GDTopic.find(query).sort({ createdAt: -1 }).limit(50);
+        if (topics && topics.length > 0) {
+          return NextResponse.json({ topics });
+        }
+      } catch (dbErr) {
+        // Fallback to memoryStore
+      }
+    }
+
+    // In-memory fallback
+    let filtered = [...memoryStore.topics];
 
     if (search.trim()) {
-      query.$or = [
-        { title: { $regex: search.trim(), $options: "i" } },
-        { description: { $regex: search.trim(), $options: "i" } },
-      ];
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q)
+      );
     }
 
     if (category && category !== "All") {
-      query.category = category;
+      filtered = filtered.filter((t) => t.category === category);
     }
 
     if (difficulty && difficulty !== "All") {
-      query.difficulty = difficulty;
+      filtered = filtered.filter((t) => t.difficulty === difficulty);
     }
 
-    const topics = await GDTopic.find(query).sort({ createdAt: -1 }).limit(50);
-
-    return NextResponse.json({ topics });
+    return NextResponse.json({ topics: filtered });
   } catch (error: any) {
-    console.error("[Topics GET Error]:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch topics" },
-      { status: 500 }
-    );
+    return NextResponse.json({ topics: DEFAULT_TOPICS });
   }
 }
 
@@ -66,9 +93,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await connectToDatabase();
+    const db = await safeConnectToDatabase();
+    if (db) {
+      try {
+        const topic = await GDTopic.create({
+          title: title.trim(),
+          category,
+          difficulty: difficulty || "Intermediate",
+          description: description.trim(),
+          background: background?.trim() || "",
+          discussionPoints: Array.isArray(discussionPoints) ? discussionPoints : [],
+          argumentsFor: Array.isArray(argumentsFor) ? argumentsFor : [],
+          argumentsAgainst: Array.isArray(argumentsAgainst) ? argumentsAgainst : [],
+          isActive: true,
+        });
 
-    const topic = await GDTopic.create({
+        return NextResponse.json({ topic }, { status: 201 });
+      } catch (dbErr) {
+        // Fall back to memoryStore
+      }
+    }
+
+    const memTopic = {
+      _id: "topic-" + Date.now(),
       title: title.trim(),
       category,
       difficulty: difficulty || "Intermediate",
@@ -78,9 +125,11 @@ export async function POST(req: NextRequest) {
       argumentsFor: Array.isArray(argumentsFor) ? argumentsFor : [],
       argumentsAgainst: Array.isArray(argumentsAgainst) ? argumentsAgainst : [],
       isActive: true,
-    });
+      createdAt: new Date(),
+    };
+    memoryStore.topics.unshift(memTopic);
 
-    return NextResponse.json({ topic }, { status: 201 });
+    return NextResponse.json({ topic: memTopic }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || "Failed to create topic" },

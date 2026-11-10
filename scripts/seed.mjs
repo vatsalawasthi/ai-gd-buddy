@@ -191,98 +191,103 @@ const TOPICS_DATA = [
 ];
 
 async function seed() {
-  console.log("Connecting to MongoDB at:", MONGODB_URI);
-  await mongoose.connect(MONGODB_URI, { dbName: "ai_gd_buddy" });
-  console.log("Connected successfully!");
+  console.log("Checking connection to MongoDB at:", MONGODB_URI);
+  try {
+    await mongoose.connect(MONGODB_URI, { dbName: "ai_gd_buddy", serverSelectionTimeoutMS: 3000 });
+    console.log("✅ Connected successfully to MongoDB!");
 
-  const UserSchema = new mongoose.Schema({
-    fullName: String,
-    email: { type: String, unique: true },
-    passwordHash: String,
-    role: { type: String, default: "student" },
-    onboardingCompleted: { type: Boolean, default: true },
-    college: String,
-    graduationYear: Number,
-    educationLevel: String,
-    careerGoal: String,
-    confidenceLevel: String,
-  }, { timestamps: true });
+    const UserSchema = new mongoose.Schema({
+      fullName: String,
+      email: { type: String, unique: true },
+      passwordHash: String,
+      role: { type: String, default: "student" },
+      onboardingCompleted: { type: Boolean, default: true },
+      college: String,
+      graduationYear: Number,
+      educationLevel: String,
+      careerGoal: String,
+      confidenceLevel: String,
+    }, { timestamps: true });
 
-  const GDTopicSchema = new mongoose.Schema({
-    title: String,
-    category: String,
-    difficulty: String,
-    description: String,
-    background: String,
-    discussionPoints: [String],
-    argumentsFor: [String],
-    argumentsAgainst: [String],
-    isActive: { type: Boolean, default: true },
-    createdAt: { type: Date, default: Date.now }
-  });
-
-  const User = mongoose.models.User || mongoose.model("User", UserSchema);
-  const GDTopic = mongoose.models.GDTopic || mongoose.model("GDTopic", GDTopicSchema);
-
-  // Seed default admin user
-  const adminEmail = "admin@aigdbuddy.com";
-  const existingAdmin = await User.findOne({ email: adminEmail });
-  if (!existingAdmin) {
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash("AdminPass123!", salt);
-    await User.create({
-      fullName: "Platform Administrator",
-      email: adminEmail,
-      passwordHash: hash,
-      role: "admin",
-      college: "Indian Institute of Technology",
-      graduationYear: 2024,
-      educationLevel: "M.Tech / M.Sc",
-      careerGoal: "Campus placements",
-      confidenceLevel: "Confident",
-      onboardingCompleted: true,
+    const GDTopicSchema = new mongoose.Schema({
+      title: String,
+      category: String,
+      difficulty: String,
+      description: String,
+      background: String,
+      discussionPoints: [String],
+      argumentsFor: [String],
+      argumentsAgainst: [String],
+      isActive: { type: Boolean, default: true },
+      createdAt: { type: Date, default: Date.now }
     });
-    console.log("Admin account created:", adminEmail, "/ AdminPass123!");
-  } else {
-    console.log("Admin account already exists:", adminEmail);
-  }
 
-  // Seed test student user
-  const studentEmail = "student@demo.com";
-  const existingStudent = await User.findOne({ email: studentEmail });
-  if (!existingStudent) {
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash("StudentPass123!", salt);
-    await User.create({
-      fullName: "Aarav Sharma",
-      email: studentEmail,
-      passwordHash: hash,
-      role: "student",
-      college: "Delhi Technological University",
-      graduationYear: 2026,
-      educationLevel: "B.Tech / B.E.",
-      careerGoal: "Campus placements",
-      confidenceLevel: "Intermediate",
-      onboardingCompleted: true,
-    });
-    console.log("Demo student created:", studentEmail, "/ StudentPass123!");
-  }
+    const User = mongoose.models.User || mongoose.model("User", UserSchema);
+    const GDTopic = mongoose.models.GDTopic || mongoose.model("GDTopic", GDTopicSchema);
 
-  // Seed GD Topics
-  console.log("Seeding verified GD topics...");
-  for (const topicData of TOPICS_DATA) {
-    const exists = await GDTopic.findOne({ title: topicData.title });
-    if (!exists) {
-      await GDTopic.create(topicData);
-      console.log(`+ Seeded topic: "${topicData.title}"`);
+    // Seed default admin user
+    const adminEmail = "admin@aigdbuddy.com";
+    const existingAdmin = await User.findOne({ email: adminEmail });
+    if (!existingAdmin) {
+      const salt = await bcrypt.genSalt(10);
+      const hash = await bcrypt.hash("AdminPass123!", salt);
+      await User.create({
+        fullName: "Platform Administrator",
+        email: adminEmail,
+        passwordHash: hash,
+        role: "admin",
+        college: "Indian Institute of Technology",
+        graduationYear: 2024,
+        educationLevel: "M.Tech / M.Sc",
+        careerGoal: "Campus placements",
+        confidenceLevel: "Confident",
+        onboardingCompleted: true,
+      });
+      console.log("Admin account created:", adminEmail, "/ AdminPass123!");
     }
-  }
 
-  console.log("Seeding completed successfully!");
-  process.exit(0);
+    // Seed test student user
+    const studentEmail = "student@demo.com";
+    const existingStudent = await User.findOne({ email: studentEmail });
+    if (!existingStudent) {
+      const salt = await bcrypt.genSalt(10);
+      const hash = await bcrypt.hash("StudentPass123!", salt);
+      await User.create({
+        fullName: "Aarav Sharma",
+        email: studentEmail,
+        passwordHash: hash,
+        role: "student",
+        college: "Delhi Technological University",
+        graduationYear: 2026,
+        educationLevel: "B.Tech / B.E.",
+        careerGoal: "Campus placements",
+        confidenceLevel: "Intermediate",
+        onboardingCompleted: true,
+      });
+      console.log("Demo student created:", studentEmail, "/ StudentPass123!");
+    }
+
+    // Seed GD Topics
+    for (const topicData of TOPICS_DATA) {
+      const exists = await GDTopic.findOne({ title: topicData.title });
+      if (!exists) {
+        await GDTopic.create(topicData);
+        console.log(`+ Seeded topic: "${topicData.title}"`);
+      }
+    }
+
+    console.log("🎉 Seeding completed successfully into MongoDB!");
+    process.exit(0);
+  } catch (err) {
+    console.log("\n⚠️  Notice: Local MongoDB daemon is not running on 127.0.0.1:27017.");
+    console.log("💡 To connect to MongoDB Atlas (recommended for cloud storage):");
+    console.log("   1. Create a free database at https://www.mongodb.com/atlas");
+    console.log("   2. Copy your connection string into .env.local (e.g. MONGODB_URI=mongodb+srv://...)");
+    console.log("   3. Run 'npm run seed' again.\n");
+    console.log("🚀 In the meantime, AI GD Buddy runs with built-in in-memory fallback!");
+    console.log("   You can run 'npm run dev' and immediately log in with Demo Student/Admin.\n");
+    process.exit(0);
+  }
 }
 
-seed().catch((err) => {
-  console.error("Seeding error:", err);
-  process.exit(1);
-});
+seed();

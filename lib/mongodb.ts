@@ -61,6 +61,15 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
   }
 }
 
+export async function safeConnectToDatabase(): Promise<typeof mongoose | null> {
+  try {
+    return await connectToDatabase();
+  } catch (err: any) {
+    // Graceful offline fallback
+    return null;
+  }
+}
+
 export function isDbConnected(): boolean {
   return mongoose.connection.readyState === 1;
 }
