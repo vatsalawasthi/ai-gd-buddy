@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { connectToDatabase } from "@/lib/mongodb";
+import { safeConnectToDatabase } from "@/lib/mongodb";
 import GDTopic from "@/models/GDTopic";
+import { memoryStore } from "@/lib/memoryStore";
 
 export async function GET() {
   try {
@@ -10,9 +11,17 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await connectToDatabase();
-    const topics = await GDTopic.find().sort({ createdAt: -1 });
-    return NextResponse.json({ topics });
+    const db = await safeConnectToDatabase();
+    if (db) {
+      try {
+        const topics = await GDTopic.find().sort({ createdAt: -1 });
+        return NextResponse.json({ topics });
+      } catch (dbErr) {
+        // Fall back to memoryStore
+      }
+    }
+
+    return NextResponse.json({ topics: memoryStore.topics });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message }, { status: 500 });
   }
@@ -27,20 +36,37 @@ export async function PUT(req: NextRequest) {
 
     const { id, isActive, title, category, difficulty, description } = await req.json();
 
-    await connectToDatabase();
-    const updated = await GDTopic.findByIdAndUpdate(
-      id,
-      {
-        ...(isActive !== undefined && { isActive }),
-        ...(title && { title }),
-        ...(category && { category }),
-        ...(difficulty && { difficulty }),
-        ...(description && { description }),
-      },
-      { new: true }
-    );
+    const db = await safeConnectToDatabase();
+    if (db) {
+      try {
+        const updated = await GDTopic.findByIdAndUpdate(
+          id,
+          {
+            ...(isActive !== undefined && { isActive }),
+            ...(title && { title }),
+            ...(category && { category }),
+            ...(difficulty && { difficulty }),
+            ...(description && { description }),
+          },
+          { new: true }
+        );
+        if (updated) return NextResponse.json({ topic: updated });
+      } catch (dbErr) {
+        // Fall back to memoryStore
+      }
+    }
 
-    return NextResponse.json({ topic: updated });
+    const memTopic = memoryStore.topics.find((t) => t._id === id);
+    if (memTopic) {
+      if (isActive !== undefined) memTopic.isActive = isActive;
+      if (title) memTopic.title = title;
+      if (category) memTopic.category = category;
+      if (difficulty) memTopic.difficulty = difficulty;
+      if (description) memTopic.description = description;
+      return NextResponse.json({ topic: memTopic });
+    }
+
+    return NextResponse.json({ error: "Topic not found" }, { status: 404 });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message }, { status: 500 });
   }
@@ -60,8 +86,20 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Topic ID required" }, { status: 400 });
     }
 
-    await connectToDatabase();
-    await GDTopic.findByIdAndDelete(id);
+    const db = await safeConnectToDatabase();
+    if (db) {
+      try {
+        await GDTopic.findByIdAndDelete(id);
+        return NextResponse.json({ message: "Topic deleted" });
+      } catch (dbErr) {
+        // Fall back to memoryStore
+      }
+    }
+
+    const idx = memoryStore.topics.findIndex((t) => t._id === id);
+    if (idx !== -1) {
+      memoryStore.topics.splice(idx, 1);
+    }
 
     return NextResponse.json({ message: "Topic deleted" });
   } catch (error: any) {

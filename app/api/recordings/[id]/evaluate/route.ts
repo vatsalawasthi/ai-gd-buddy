@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { connectToDatabase } from "@/lib/mongodb";
+import { safeConnectToDatabase } from "@/lib/mongodb";
 import { evaluateRecordingSpeaker } from "@/services/recording/recordingService";
 
 export async function POST(
@@ -22,11 +22,11 @@ export async function POST(
       );
     }
 
-    await connectToDatabase();
+    await safeConnectToDatabase();
 
     const { recording, evaluation } = await evaluateRecordingSpeaker(
       params.id,
-      user._id.toString(),
+      user._id ? user._id.toString() : user.id,
       speakerLabel
     );
 

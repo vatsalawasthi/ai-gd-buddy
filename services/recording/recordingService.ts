@@ -3,6 +3,8 @@ import { evaluateGDSession } from "../evaluation/evaluator";
 import GDEvaluation from "@/models/GDEvaluation";
 import Recording from "@/models/Recording";
 import mongoose from "mongoose";
+import { safeConnectToDatabase } from "@/lib/mongodb";
+import { memoryStore } from "@/lib/memoryStore";
 
 export interface TranscribeAndDiarizeResult {
   transcript: string;
@@ -20,7 +22,6 @@ export async function processRecordingAudio(
   topic: string,
   identifiedUserSpeaker?: string
 ): Promise<TranscribeAndDiarizeResult> {
-  // If file is an audio recording, simulate speech recognition and diarization
   const sampleSegments = [
     {
       speaker: "Speaker 1",
@@ -69,14 +70,27 @@ export async function evaluateRecordingSpeaker(
   userId: string,
   speakerLabel: string
 ) {
-  const recording = await Recording.findById(recordingId);
+  const db = await safeConnectToDatabase();
+  let recording: any = null;
+
+  if (db) {
+    try {
+      recording = await Recording.findById(recordingId);
+    } catch (e) {
+      // Fallback
+    }
+  }
+
+  if (!recording) {
+    recording = memoryStore.recordings.get(recordingId);
+  }
+
   if (!recording) throw new Error("Recording not found");
 
   const segments = recording.speakerSegments || [];
-  const userSegments = segments.filter((s) => s.speaker === speakerLabel);
 
-  const formattedMessages = segments.map((s, idx) => ({
-    _id: new mongoose.Types.ObjectId().toString(),
+  const formattedMessages = segments.map((s: any, idx: number) => ({
+    _id: `rec-msg-${idx}`,
     sessionId: recordingId,
     speakerId: s.speaker,
     speakerName: s.speaker === speakerLabel ? "User (You)" : s.speaker,
@@ -94,16 +108,38 @@ export async function evaluateRecordingSpeaker(
     userName: `Candidate (${speakerLabel})`,
   });
 
-  const evaluationDoc = await GDEvaluation.create({
+  if (db) {
+    try {
+      const evaluationDoc = await GDEvaluation.create({
+        userId,
+        sessionId: recordingId,
+        ...evalResult,
+      });
+
+      recording.processingStatus = "completed";
+      recording.identifiedUserSpeaker = speakerLabel;
+      recording.evaluationId = evaluationDoc._id;
+      await recording.save();
+
+      return { recording, evaluation: evaluationDoc };
+    } catch (dbErr) {
+      // Fallback
+    }
+  }
+
+  // Memory fallback
+  const memEvaluation = {
+    _id: `eval-rec-${Date.now()}`,
     userId,
     sessionId: recordingId,
     ...evalResult,
-  });
+    createdAt: new Date(),
+  };
 
   recording.processingStatus = "completed";
   recording.identifiedUserSpeaker = speakerLabel;
-  recording.evaluationId = evaluationDoc._id;
-  await recording.save();
+  recording.evaluationId = memEvaluation._id;
+  memoryStore.evaluations.set(recordingId, memEvaluation as any);
 
-  return { recording, evaluation: evaluationDoc };
+  return { recording, evaluation: memEvaluation };
 }
