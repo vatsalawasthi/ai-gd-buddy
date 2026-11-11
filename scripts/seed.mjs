@@ -225,58 +225,41 @@ async function seed() {
     const User = mongoose.models.User || mongoose.model("User", UserSchema);
     const GDTopic = mongoose.models.GDTopic || mongoose.model("GDTopic", GDTopicSchema);
 
-    // Seed default admin user
-    const adminEmail = "admin@aigdbuddy.com";
-    const existingAdmin = await User.findOne({ email: adminEmail });
-    if (!existingAdmin) {
-      const salt = await bcrypt.genSalt(10);
-      const hash = await bcrypt.hash("AdminPass123!", salt);
-      await User.create({
-        fullName: "Platform Administrator",
-        email: adminEmail,
-        passwordHash: hash,
-        role: "admin",
-        college: "Indian Institute of Technology",
-        graduationYear: 2024,
-        educationLevel: "M.Tech / M.Sc",
-        careerGoal: "Campus placements",
-        confidenceLevel: "Confident",
-        onboardingCompleted: true,
-      });
-      console.log("Admin account created:", adminEmail, "/ AdminPass123!");
+    // Optional: Seed admin user if environment variables provided
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (adminEmail && adminPassword) {
+      const existingAdmin = await User.findOne({ email: adminEmail.toLowerCase().trim() });
+      if (!existingAdmin) {
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(adminPassword, salt);
+        await User.create({
+          fullName: process.env.ADMIN_NAME || "System Administrator",
+          email: adminEmail.toLowerCase().trim(),
+          passwordHash: hash,
+          role: "admin",
+          onboardingCompleted: true,
+        });
+        console.log(`✅ Admin account created: ${adminEmail}`);
+      } else {
+        console.log(`ℹ️  Admin account already exists: ${adminEmail}`);
+      }
     }
 
-    // Seed test student user
-    const studentEmail = "student@demo.com";
-    const existingStudent = await User.findOne({ email: studentEmail });
-    if (!existingStudent) {
-      const salt = await bcrypt.genSalt(10);
-      const hash = await bcrypt.hash("StudentPass123!", salt);
-      await User.create({
-        fullName: "Aarav Sharma",
-        email: studentEmail,
-        passwordHash: hash,
-        role: "student",
-        college: "Delhi Technological University",
-        graduationYear: 2026,
-        educationLevel: "B.Tech / B.E.",
-        careerGoal: "Campus placements",
-        confidenceLevel: "Intermediate",
-        onboardingCompleted: true,
-      });
-      console.log("Demo student created:", studentEmail, "/ StudentPass123!");
-    }
-
-    // Seed GD Topics
+    // Seed Curriculum GD Topics
+    let seededCount = 0;
     for (const topicData of TOPICS_DATA) {
       const exists = await GDTopic.findOne({ title: topicData.title });
       if (!exists) {
         await GDTopic.create(topicData);
         console.log(`+ Seeded topic: "${topicData.title}"`);
+        seededCount++;
       }
     }
 
-    console.log("🎉 Seeding completed successfully into MongoDB!");
+    console.log(`🎉 Database seeding completed! (${seededCount} new topics added)`);
+    console.log("💡 Tip: To create an admin account, run: npm run create-admin <email> <password> <name>");
     process.exit(0);
   } catch (err) {
     console.log("\n⚠️  Notice: Local MongoDB daemon is not running on 127.0.0.1:27017.");

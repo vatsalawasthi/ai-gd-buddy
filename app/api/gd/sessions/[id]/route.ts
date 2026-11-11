@@ -182,7 +182,7 @@ export async function PUT(
     memSession.evaluationId = evalId;
 
     return NextResponse.json({
-      message: "Session evaluated successfully (Demo Mode)",
+      message: "Session evaluated successfully",
       evaluationId: evalId,
       overallScore: evaluationData.overallScore,
     });

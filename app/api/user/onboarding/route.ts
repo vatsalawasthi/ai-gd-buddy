@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     memUser.onboardingCompleted = true;
 
     return NextResponse.json({
-      message: "Onboarding completed successfully (Demo Mode)",
+      message: "Onboarding completed successfully",
       user: {
         id: memUser._id || memUser.id,
         fullName: memUser.fullName,

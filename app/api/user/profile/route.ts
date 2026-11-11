@@ -67,7 +67,7 @@ export async function PUT(req: NextRequest) {
     memUser.confidenceLevel = confidenceLevel;
 
     return NextResponse.json({
-      message: "Profile updated successfully (Demo Mode)",
+      message: "Profile updated successfully",
       user: memUser,
     });
   } catch (error: any) {

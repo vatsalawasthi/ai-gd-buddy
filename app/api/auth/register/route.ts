@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json(
       {
-        message: "Registration successful (Demo Mode)",
+        message: "Registration successful",
         user: {
           id: userId,
           fullName: newUserObj.fullName,

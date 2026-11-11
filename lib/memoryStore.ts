@@ -220,37 +220,7 @@ export const DEFAULT_TOPICS: IGDTopic[] = [
   },
 ];
 
-export const DEMO_STUDENT: IUser = {
-  _id: "demo-student-id",
-  fullName: "Aarav Sharma",
-  email: "student@demo.com",
-  college: "Delhi Technological University",
-  graduationYear: 2026,
-  educationLevel: "B.Tech / B.E.",
-  careerGoal: "Campus placements",
-  confidenceLevel: "Intermediate",
-  role: "student",
-  onboardingCompleted: true,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
-
-export const DEMO_ADMIN: IUser = {
-  _id: "demo-admin-id",
-  fullName: "Platform Administrator",
-  email: "admin@aigdbuddy.com",
-  college: "Indian Institute of Technology",
-  graduationYear: 2024,
-  educationLevel: "M.Tech / M.Sc",
-  careerGoal: "Campus placements",
-  confidenceLevel: "Confident",
-  role: "admin",
-  onboardingCompleted: true,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
-
-// Global in-memory storage maps for seamless zero-setup testing
+// Global in-memory storage maps for clean testing and fallback
 interface MemoryStoreState {
   users: Map<string, IUser>;
   topics: IGDTopic[];
@@ -267,46 +237,14 @@ declare global {
 }
 
 if (!global.__memoryStore) {
-  const users = new Map<string, IUser>();
-  users.set(DEMO_STUDENT.email.toLowerCase(), DEMO_STUDENT);
-  users.set(DEMO_ADMIN.email.toLowerCase(), DEMO_ADMIN);
-
-  const userProgress = new Map<string, IUserProgress>();
-  userProgress.set(DEMO_STUDENT._id, {
-    _id: "prog-" + DEMO_STUDENT._id,
-    userId: DEMO_STUDENT._id,
-    sessionsCompleted: 1,
-    averageScore: 78,
-    highestScore: 78,
-    totalPracticeTime: 10,
-    scoreHistory: [
-      {
-        sessionId: "mock-sess-1",
-        date: new Date(),
-        score: 78,
-        topic: DEFAULT_TOPICS[0].title,
-      },
-    ],
-    categoryAverages: {
-      communication: 82,
-      content: 75,
-      confidence: 80,
-      listening: 76,
-      leadership: 74,
-      participation: 85,
-      fluency: 78,
-    },
-    updatedAt: new Date(),
-  });
-
   global.__memoryStore = {
-    users,
+    users: new Map(),
     topics: [...DEFAULT_TOPICS],
     sessions: new Map(),
     messages: new Map(),
     evaluations: new Map(),
     recordings: new Map(),
-    userProgress,
+    userProgress: new Map(),
   };
 }
 

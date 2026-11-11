@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { safeConnectToDatabase } from "./mongodb";
 import User, { IUserDocument } from "@/models/User";
-import { memoryStore, DEMO_STUDENT } from "./memoryStore";
+import { memoryStore } from "./memoryStore";
 
 const JWT_SECRET = process.env.AUTH_SECRET || "ai_gd_buddy_secret_jwt_key_fallback_2026_secure";
 const COOKIE_NAME = "ai_gd_token";
@@ -67,11 +67,11 @@ export async function getCurrentUser(): Promise<any | null> {
       fullName: decoded.fullName,
       email: decoded.email,
       role: decoded.role,
-      college: DEMO_STUDENT.college,
-      educationLevel: DEMO_STUDENT.educationLevel,
-      graduationYear: DEMO_STUDENT.graduationYear,
-      careerGoal: DEMO_STUDENT.careerGoal,
-      confidenceLevel: DEMO_STUDENT.confidenceLevel,
+      college: "",
+      educationLevel: "Undergraduate",
+      graduationYear: new Date().getFullYear() + 1,
+      careerGoal: "Campus placements",
+      confidenceLevel: "Intermediate",
       onboardingCompleted: true,
     };
   } catch (error) {

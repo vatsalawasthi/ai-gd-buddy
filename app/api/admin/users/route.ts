@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { safeConnectToDatabase } from "@/lib/mongodb";
 import User from "@/models/User";
-import { memoryStore, DEMO_STUDENT, DEMO_ADMIN } from "@/lib/memoryStore";
+import { memoryStore } from "@/lib/memoryStore";
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user || user.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden: Admin privileges required" }, { status: 403 });
     }
 
     const db = await safeConnectToDatabase();
@@ -37,13 +37,6 @@ export async function GET() {
       onboardingCompleted: u.onboardingCompleted,
       createdAt: u.createdAt,
     }));
-
-    if (!memUsers.some((u) => u.email === DEMO_STUDENT.email)) {
-      memUsers.unshift(DEMO_STUDENT as any);
-    }
-    if (!memUsers.some((u) => u.email === DEMO_ADMIN.email)) {
-      memUsers.push(DEMO_ADMIN as any);
-    }
 
     return NextResponse.json({ users: memUsers });
   } catch (error: any) {

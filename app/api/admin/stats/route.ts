@@ -57,7 +57,7 @@ export async function GET() {
     }
 
     // In-memory fallback
-    const totalUsers = memoryStore.users.size + 1;
+    const totalUsers = memoryStore.users.size;
     const totalSessions = memoryStore.sessions.size;
     const totalTopics = memoryStore.topics.length;
     const totalRecordings = memoryStore.recordings.size;
@@ -67,22 +67,11 @@ export async function GET() {
         totalUsers,
         totalSessions,
         completedSessions: totalSessions,
-        averagePlatformScore: 78,
+        averagePlatformScore: 0,
         totalTopics,
         totalRecordings,
       },
-      recentAILogs: [
-        {
-          _id: "log-1",
-          feature: "Discussion Turn Generation",
-          aiModel: "gemini-1.5-flash",
-          promptTokens: 420,
-          completionTokens: 85,
-          totalTokens: 505,
-          estimatedCostUSD: 0.0001,
-          createdAt: new Date(),
-        },
-      ],
+      recentAILogs: [],
     });
   } catch (error: any) {
     return NextResponse.json(

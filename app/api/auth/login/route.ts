@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { safeConnectToDatabase } from "@/lib/mongodb";
 import User from "@/models/User";
 import { verifyPassword, signToken, COOKIE_NAME } from "@/lib/auth";
-import { memoryStore, DEMO_STUDENT, DEMO_ADMIN } from "@/lib/memoryStore";
+import { memoryStore } from "@/lib/memoryStore";
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,54 +56,14 @@ export async function POST(req: NextRequest) {
           }
         }
       } catch (dbErr) {
-        console.warn("[MongoDB] Query error, falling back to demo memory:", dbErr);
+        console.warn("[MongoDB] Query error:", dbErr);
       }
     }
 
-    // Seamless offline fallback for Demo Student and Demo Admin
-    if (
-      (normalizedEmail === "student@demo.com" && password === "StudentPass123!") ||
-      (normalizedEmail === "admin@aigdbuddy.com" && password === "AdminPass123!")
-    ) {
-      const isStudent = normalizedEmail.includes("student");
-      const userObj = isStudent ? DEMO_STUDENT : DEMO_ADMIN;
-      const token = signToken({
-        userId: userObj._id,
-        email: userObj.email,
-        role: userObj.role,
-        fullName: userObj.fullName,
-      });
-
-      const response = NextResponse.json({
-        message: "Login successful (Demo Mode)",
-        user: {
-          id: userObj._id,
-          fullName: userObj.fullName,
-          email: userObj.email,
-          role: userObj.role,
-          onboardingCompleted: true,
-        },
-      });
-
-      response.cookies.set({
-        name: COOKIE_NAME,
-        value: token,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7,
-      });
-
-      return response;
-    }
-
-    // Check memory store for registered users during this server run
+    // In-memory store check for users registered during current runtime
     const memUser = memoryStore.users.get(normalizedEmail);
-    if (memUser) {
-      const isMatch = memUser.passwordHash
-        ? await verifyPassword(password, memUser.passwordHash)
-        : password === "StudentPass123!";
+    if (memUser && memUser.passwordHash) {
+      const isMatch = await verifyPassword(password, memUser.passwordHash);
       if (isMatch) {
         const token = signToken({
           userId: memUser._id,

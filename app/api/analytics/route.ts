@@ -4,7 +4,17 @@ import { safeConnectToDatabase } from "@/lib/mongodb";
 import UserProgress from "@/models/UserProgress";
 import GDSession from "@/models/GDSession";
 import GDEvaluation from "@/models/GDEvaluation";
-import { memoryStore, DEMO_STUDENT } from "@/lib/memoryStore";
+import { memoryStore } from "@/lib/memoryStore";
+
+const EMPTY_CATEGORY_RADAR = [
+  { subject: "Communication (20%)", score: 0, fullMark: 100 },
+  { subject: "Content Quality (20%)", score: 0, fullMark: 100 },
+  { subject: "Confidence (15%)", score: 0, fullMark: 100 },
+  { subject: "Listening Skills (15%)", score: 0, fullMark: 100 },
+  { subject: "Leadership (10%)", score: 0, fullMark: 100 },
+  { subject: "Participation (10%)", score: 0, fullMark: 100 },
+  { subject: "Language & Fluency (10%)", score: 0, fullMark: 100 },
+];
 
 export async function GET(req: NextRequest) {
   try {
@@ -61,25 +71,47 @@ export async function GET(req: NextRequest) {
             scoreTrends,
             categoryRadar,
             latestSuggestions: latestEval?.recommendations || [
-              "Complete your first simulated GD to unlock personalized AI feedback.",
+              "Complete your next GD practice session to unlock targeted feedback.",
             ],
             recommendedTopics: latestEval?.recommendedTopics || [
               "AI & Automation: Catalyst for High-Value Employment or Threat to Campus Placements?",
             ],
           });
         }
+
+        // Real user with 0 completed sessions
+        return NextResponse.json({
+          progress: progress || {
+            sessionsCompleted: 0,
+            averageScore: 0,
+            highestScore: 0,
+            totalPracticeTime: 0,
+          },
+          recentSessions: [],
+          scoreTrends: [],
+          categoryRadar: EMPTY_CATEGORY_RADAR,
+          latestSuggestions: [
+            "Start your first mock GD session to benchmark your baseline across 7 communication pillars.",
+            "Use clear structure (Introduction, 2 Key Points, Conclusion) during your speaking turns.",
+            "Maintain an assertive yet respectful tone when addressing opposing views.",
+          ],
+          recommendedTopics: [
+            "AI & Automation: Catalyst for High-Value Employment or Threat to Campus Placements?",
+            "Work From Home vs Hybrid: Defining the Future Workplace for Fresh Graduates",
+          ],
+        });
       } catch (dbErr) {
         // Fall back to memoryStore
       }
     }
 
-    // Memory Store fallback for instant demo testing
-    const memProg = memoryStore.userProgress.get(userId) || memoryStore.userProgress.get(DEMO_STUDENT._id);
+    // In-memory store fallback for current runtime user
+    const memProg = memoryStore.userProgress.get(userId);
     const memSessions = Array.from(memoryStore.sessions.values()).filter(
-      (s) => s.userId === userId || s.userId === DEMO_STUDENT._id
+      (s) => s.userId === userId
     );
     const memEvals = Array.from(memoryStore.evaluations.values()).filter(
-      (e) => e.userId === userId || e.userId === DEMO_STUDENT._id
+      (e) => e.userId === userId
     );
 
     const scoreTrends = memEvals
@@ -98,32 +130,17 @@ export async function GET(req: NextRequest) {
         date: new Date(ev.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       }));
 
-    if (scoreTrends.length === 0 && memProg) {
-      scoreTrends.push({
-        session: "GD #1",
-        overall: memProg.averageScore,
-        communication: memProg.categoryAverages.communication,
-        content: memProg.categoryAverages.content,
-        confidence: memProg.categoryAverages.confidence,
-        listening: memProg.categoryAverages.listening,
-        leadership: memProg.categoryAverages.leadership,
-        participation: memProg.categoryAverages.participation,
-        fluency: memProg.categoryAverages.fluency,
-        date: "Today",
-      });
-    }
-
     const cat = memProg?.categoryAverages || {
-      communication: 82,
-      content: 75,
-      confidence: 80,
-      listening: 76,
-      leadership: 74,
-      participation: 85,
-      fluency: 78,
+      communication: 0,
+      content: 0,
+      confidence: 0,
+      listening: 0,
+      leadership: 0,
+      participation: 0,
+      fluency: 0,
     };
 
-    const categoryRadar = [
+    const categoryRadar = memEvals.length > 0 ? [
       { subject: "Communication (20%)", score: cat.communication, fullMark: 100 },
       { subject: "Content Quality (20%)", score: cat.content, fullMark: 100 },
       { subject: "Confidence (15%)", score: cat.confidence, fullMark: 100 },
@@ -131,28 +148,27 @@ export async function GET(req: NextRequest) {
       { subject: "Leadership (10%)", score: cat.leadership, fullMark: 100 },
       { subject: "Participation (10%)", score: cat.participation, fullMark: 100 },
       { subject: "Language & Fluency (10%)", score: cat.fluency, fullMark: 100 },
-    ];
+    ] : EMPTY_CATEGORY_RADAR;
 
     return NextResponse.json({
       progress: memProg || {
-        sessionsCompleted: 1,
-        averageScore: 78,
-        highestScore: 78,
-        totalPracticeTime: 10,
+        sessionsCompleted: 0,
+        averageScore: 0,
+        highestScore: 0,
+        totalPracticeTime: 0,
         categoryAverages: cat,
       },
       recentSessions: memSessions,
       scoreTrends,
       categoryRadar,
       latestSuggestions: [
+        "Start your first mock GD session to benchmark your baseline across 7 communication pillars.",
         "Structure your speaking turns with clear numeric signposts (e.g. 'First on economics, second on governance').",
         "Acknowledge the previous speaker by name to maximize your Listening Skills score.",
-        "Practice synthesizing counterarguments diplomatically in the final 60 seconds.",
       ],
       recommendedTopics: [
         "AI & Automation: Catalyst for High-Value Employment or Threat to Campus Placements?",
         "Work From Home vs Hybrid: Defining the Future Workplace for Fresh Graduates",
-        "Social Media Algorithms and Mental Well-Being: Should Digital Addictiveness Be Regulated?",
       ],
     });
   } catch (error: any) {
